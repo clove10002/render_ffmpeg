@@ -63,6 +63,36 @@ app.post('/api/clip', async (req, res) => {
   }
 });
 
+app.post('/api/fetch-url', async (req, res) => {
+  const { url } = req.body;
+  const outputPath = path.join(__dirname, 'output.mp4');
+
+  if (!url) return res.status(400).send('Missing URL');
+
+  try {
+    ffmpeg(url)
+      .outputOptions('-c copy')
+      .on('start', cmd => console.log('[FFmpeg]', cmd))
+      .on('stderr', line => console.log('[FFmpeg]', line))
+      .on('end', () => {
+        const readStream = fs.createReadStream(outputPath);
+        res.setHeader('Content-Type', 'video/mp4');
+        readStream.pipe(res);
+        readStream.on('close', () => {
+          fs.unlinkSync(outputPath);
+        });
+      })
+      .on('error', err => {
+        console.error('[FFmpeg Error]', err);
+        res.status(500).send('Failed to fetch video');
+      })
+      .save(outputPath);
+  } catch (err) {
+    console.error('[Server Error]', err);
+    res.status(500).send('Internal server error');
+  }
+});
+
 // Clean files every 15 min
 setInterval(() => {
   for (const file of ['input.mp4', 'output.mp4']) {
