@@ -96,66 +96,47 @@ app.post('/api/mpd-to-mp4', async (req, res) => {
 
 // reframe video and add text on top
 // Add text with white background at the top of the video
-app.post('/api/add-text-on-top', async (req, res) => {
-  const { text } = req.body;
-  if (!req.files || !req.files.video || !text)
-    return res.status(400).send('Missing video or text');
 
+app.post('/api/add-text-on-top', async (req, res) => {
+  if (!req.files || !req.files.video || !req.body.text) {
+    return res.status(400).send('Missing video or text');
+  }
+
+  const uploadedVideo = req.files.video;
+  const text = req.body.text;
   const inputPath = path.join(__dirname, 'input.mp4');
   const outputPath = path.join(__dirname, 'output.mp4');
 
-  try {
-    // Save uploaded file
-    await req.files.video.mv(inputPath);
+  const safeText = text.replace(/'/g, "\\\\'");
 
-    ffmpeg(inputPath)
-      .videoFilters([
-        `drawbox=x=0:y=0:w=iw:h=80:color=white@0.8:t=max`,
-        `drawtext=text='${text}':fontcolor=black:fontsize=24:x=(w-text_w)/2:y=20`
-      ])
-      .on('start', cmd => console.log('[FFmpeg]', cmd))
-      .on('stderr', line => console.log('[FFmpeg]', line))
-      .on('end', () => {
-        // Stream result
-        res.setHeader('Content-Type', 'video/mp4');
-        const readStream = fs.createReadStream(outputPath);
+  await uploadedVideo.mv(inputPath);
 
-        readStream.pipe(res);
-
-        readStream.on('close', () => {
-          try {
-            fs.unlinkSync(inputPath);
-            fs.unlinkSync(outputPath);
-            console.log('[CLEANUP] Temp files deleted');
-          } catch (cleanupErr) {
-            console.warn('[CLEANUP WARNING]', cleanupErr.message);
-          }
-        });
-      })
-      .on('error', err => {
-        console.error('[FFmpeg Error]', err);
-        try {
-          if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
-          if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
-          console.log('[CLEANUP] Cleanup after error');
-        } catch (cleanupErr) {
-          console.warn('[CLEANUP WARNING]', cleanupErr.message);
-        }
-        res.status(500).send('Failed to add text to video');
-      })
-      .save(outputPath);
-  } catch (err) {
-    console.error('[Server Error]', err);
-    try {
-      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
-      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
-      console.log('[CLEANUP] Cleanup after server error');
-    } catch (cleanupErr) {
-      console.warn('[CLEANUP WARNING]', cleanupErr.message);
-    }
-    res.status(500).send('Internal error');
-  }
+  let ffmpegLogs = '';
+  ffmpeg(inputPath)
+    .videoFilters([
+      'drawbox=x=0:y=0:w=iw:h=60:color=white@0.5:t=fill',
+      `drawtext=fontfile='/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf':text='${safeText}':fontcolor=black:fontsize=24:x=(w-text_w)/2:y=20`
+    ])
+    .on('stderr', line => {
+      console.log('[FFmpeg]', line);
+      ffmpegLogs += line + '\n';
+    })
+    .on('end', () => {
+      res.download(outputPath, 'video_with_text.mp4', err => {
+        if (err) console.error('Download error:', err);
+        fs.unlinkSync(inputPath);
+        fs.unlinkSync(outputPath);
+      });
+    })
+    .on('error', err => {
+      console.error('FFmpeg error:', err);
+      fs.existsSync(inputPath) && fs.unlinkSync(inputPath);
+      fs.existsSync(outputPath) && fs.unlinkSync(outputPath);
+      res.status(500).send(`Failed to add text to video:\n${ffmpegLogs.slice(0, 500)}`);
+    })
+    .save(outputPath);
 });
+
 
 // Clean files every 15 min
 setInterval(() => {
