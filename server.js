@@ -98,12 +98,18 @@ app.post('/api/mpd-to-mp4', async (req, res) => {
 // Add text with white background at the top of the video
 
 app.post('/api/add-text-on-top', async (req, res) => {
-  if (!req.files || !req.files.video || !req.body.text) {
-    return res.status(400).send('Missing video or text');
+  if (!req.files || !req.files.video || !req.body.text || !req.body.fontfamily || !req.body.fontsize || !req.body.fontcolor || !req.body.linespacing || !req.body.height || !req.body.textColor) {
+    return res.status(400).send('Missing Params');
   }
 
   const uploadedVideo = req.files.video;
   const text = req.body.text;
+  const fontFamily = req.body.fontfamily;
+  const fontSize = req.body.fontsize;
+  const fontColor = req.body.fontcolor;
+  const lineSpacing = req.body.linespacing;
+  const height = req.body.height;
+  const textColor = req.body.textcolor;
   const inputPath = path.join(__dirname, 'input.mp4');
   const outputPath = path.join(__dirname, 'output.mp4');
 
@@ -114,8 +120,8 @@ app.post('/api/add-text-on-top', async (req, res) => {
   let ffmpegLogs = '';
   ffmpeg(inputPath)
     .videoFilters([
-      'drawbox=x=0:y=0:w=iw:h=60:color=white@0.5:t=fill',
-      `drawtext=fontfile='/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf':text='${safeText}':fontcolor=black:fontsize=24:x=(w-text_w)/2:y=20`
+      `drawbox=x=0:y=0:w=iw:h=${height}:color=${textColor}:t=fill`,
+      `drawtext=fontfile='/usr/share/fonts/truetype/${fontFamily}':text='${safeText}':fontcolor=${fontColor}:fontsize=${fontSize}:x=(w-text_w)/2:y=20:line_spacing=${lineSpacing}`
     ])
     .on('stderr', line => {
       console.log('[FFmpeg]', line);
