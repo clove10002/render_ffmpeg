@@ -117,7 +117,7 @@ app.post('/api/add-text-on-top', async (req, res) => {
     .replace(/\\/g, '\\\\')    // Escape backslashes
     .replace(/:/g, '\\:')      // Escape colons
     .replace(/'/g, "\\\\'")    // Escape single quotes
-    .replace(/\n/g, '\\n');    // Escape newline characters
+    .replace(/\n/g, '\\\\n');    // Escape newline characters
 
   await uploadedVideo.mv(inputPath);
 
