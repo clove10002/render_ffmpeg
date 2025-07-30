@@ -98,7 +98,7 @@ app.post('/api/mpd-to-mp4', async (req, res) => {
 // Add text with white background at the top of the video
 
 app.post('/api/add-text-on-top', async (req, res) => {
-  if (!req.files || !req.files.video || !req.body.text || !req.body.fontfamily || !req.body.fontsize || !req.body.fontcolor || !req.body.linespacing || !req.body.height || !req.body.textColor) {
+  if (!req.files || !req.files.video || !req.body.text || !req.body.fontfamily || !req.body.fontsize || !req.body.fontcolor || !req.body.linespacing || !req.body.height || !req.body.textcolor) {
     return res.status(400).send('Missing Params');
   }
 
@@ -113,7 +113,11 @@ app.post('/api/add-text-on-top', async (req, res) => {
   const inputPath = path.join(__dirname, 'input.mp4');
   const outputPath = path.join(__dirname, 'output.mp4');
 
-  const safeText = text.replace(/'/g, "\\\\'");
+  const safeText = text
+    .replace(/\\/g, '\\\\')    // Escape backslashes
+    .replace(/:/g, '\\:')      // Escape colons
+    .replace(/'/g, "\\\\'")    // Escape single quotes
+    .replace(/\n/g, '\\n');    // Escape newline characters
 
   await uploadedVideo.mv(inputPath);
 
