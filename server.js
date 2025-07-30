@@ -98,35 +98,35 @@ app.post('/api/mpd-to-mp4', async (req, res) => {
 // Add text with white background at the top of the video
 
 app.post('/api/add-text-on-top', async (req, res) => {
-  if (!req.files || !req.files.video || !req.body.text || !req.body.fontfamily || !req.body.fontsize || !req.body.fontcolor || !req.body.linespacing || !req.body.height || !req.body.textcolor) {
+  if (
+    !req.files || 
+    !req.files.video ||
+    !req.body.textcolor || 
+    !req.body.height || 
+    !req.body.drawtextFilters
+  ) {
     return res.status(400).send('Missing Params');
   }
 
   const uploadedVideo = req.files.video;
-  const text = req.body.text;
-  const fontFamily = req.body.fontfamily;
-  const fontSize = req.body.fontsize;
-  const fontColor = req.body.fontcolor;
-  const lineSpacing = req.body.linespacing;
-  const height = req.body.height;
+  const drawtextFilters = JSON.parse(req.body.drawtextFilters); // Array of drawtext strings from client
   const textColor = req.body.textcolor;
+  const height = req.body.height;
   const inputPath = path.join(__dirname, 'input.mp4');
   const outputPath = path.join(__dirname, 'output.mp4');
 
-  const safeText = text
-    .replace(/\\/g, '\\\\')    // Escape backslashes
-    .replace(/:/g, '\\:')      // Escape colons
-    .replace(/'/g, "\\\\'")    // Escape single quotes
-    .replace(/\n/g, '\\\\n');    // Escape newline characters
-
   await uploadedVideo.mv(inputPath);
+
+  const filters = [
+    `drawbox=x=0:y=0:w=iw:h=${height}:color=${textColor}:t=fill`,
+    ...drawtextFilters.map(line =>
+      line.replace(/fontfile=['"]?/, `fontfile='/usr/share/fonts/truetype/`) // ensure full font path
+    )
+  ];
 
   let ffmpegLogs = '';
   ffmpeg(inputPath)
-    .videoFilters([
-      `drawbox=x=0:y=0:w=iw:h=${height}:color=${textColor}:t=fill`,
-      `drawtext=fontfile='/usr/share/fonts/truetype/${fontFamily}':text='${safeText}':fontcolor=${fontColor}:fontsize=${fontSize}:x=(w-text_w)/2:y=20:line_spacing=${lineSpacing}`
-    ])
+    .videoFilters(filters)
     .on('stderr', line => {
       console.log('[FFmpeg]', line);
       ffmpegLogs += line + '\n';
@@ -140,12 +140,13 @@ app.post('/api/add-text-on-top', async (req, res) => {
     })
     .on('error', err => {
       console.error('FFmpeg error:', err);
-      fs.existsSync(inputPath) && fs.unlinkSync(inputPath);
-      fs.existsSync(outputPath) && fs.unlinkSync(outputPath);
+      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
       res.status(500).send(`Failed to add text to video:\n${ffmpegLogs.slice(0, 500)}`);
     })
     .save(outputPath);
 });
+
 
 
 // Clean files every 15 min
