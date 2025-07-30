@@ -109,7 +109,7 @@ app.post('/api/add-text-on-top', async (req, res) => {
   }
 
   const uploadedVideo = req.files.video;
-  const drawtextFilters = JSON.parse(req.body.drawtextFilters); // Array of drawtext strings from client
+  const drawtextFilters = req.body.drawtextFilters;
   const textColor = req.body.textcolor;
   const height = req.body.height;
   const inputPath = path.join(__dirname, 'input.mp4');
@@ -117,16 +117,12 @@ app.post('/api/add-text-on-top', async (req, res) => {
 
   await uploadedVideo.mv(inputPath);
 
-  const filters = [
-    `drawbox=x=0:y=0:w=iw:h=${height}:color=${textColor}:t=fill`,
-    ...drawtextFilters.map(line =>
-      line.replace(/fontfile=['"]?/, `fontfile='/usr/share/fonts/truetype/`) // ensure full font path
-    )
-  ];
-
   let ffmpegLogs = '';
   ffmpeg(inputPath)
-    .videoFilters(filters)
+    .videoFilters([
+      `drawbox=x=0:y=0:w=iw:h=${height}:color=${textColor}:t=fill`,
+      `${drawtextFilters}`
+    ])
     .on('stderr', line => {
       console.log('[FFmpeg]', line);
       ffmpegLogs += line + '\n';
